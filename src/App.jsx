@@ -1,24 +1,12 @@
-import logo from './assets/react-logo.svg';
-import './App.css';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import TasksListPage from './features/tasks/pages/TasksListPage';
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.jsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Routes>
+      <Route element={<Navigate replace to="/tasks" />} path="/" />
+      <Route element={<TasksListPage />} path="/tasks" />
+    </Routes>
   );
 }
 
