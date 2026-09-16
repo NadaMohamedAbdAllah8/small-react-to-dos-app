@@ -10,12 +10,38 @@ Install the project dependencies:
 npm install
 ```
 
-## Available commands
+Create `.env.local` from `.env.example`. The default configuration points the app to the local mock API:
 
-Start the Vite development server:
+```dotenv
+VITE_API_BASE_URL=http://localhost:3001/api
+```
+
+## Local development
+
+Start the mock API in one terminal:
+
+```bash
+npm run mock:api
+```
+
+Start the Vite development server in another terminal:
 
 ```bash
 npm run dev
+```
+
+## Available commands
+
+Start only the Vite development server:
+
+```bash
+npm run dev
+```
+
+Start only the local mock API:
+
+```bash
+npm run mock:api
 ```
 
 Create a production build in `dist/`:
