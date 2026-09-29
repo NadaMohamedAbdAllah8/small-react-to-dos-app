@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { request } from '../../api/client';
-import { createTask, getTask, updateTask } from './api';
+import { createTask, deleteTask, getTask, updateTask } from './api';
 
 vi.mock('../../api/client', () => ({
   request: vi.fn(),
@@ -126,5 +126,19 @@ describe('updateTask', () => {
       },
     });
     expect(result).toBe(updatedTask);
+  });
+});
+
+describe('deleteTask', () => {
+  it('deletes the selected task and forwards the abort signal', async () => {
+    const abortController = new AbortController();
+    request.mockResolvedValue(null);
+
+    await deleteTask('task/7', { signal: abortController.signal });
+
+    expect(request).toHaveBeenCalledWith('/tasks/task%2F7', {
+      method: 'DELETE',
+      signal: abortController.signal,
+    });
   });
 });

@@ -70,3 +70,10 @@ export async function updateTask(taskId, taskPayload, { signal } = {}) {
     'The updated task response must include a numeric id.',
   );
 }
+
+export function deleteTask(taskId, { signal } = {}) {
+  return request(`/tasks/${encodeURIComponent(taskId)}`, {
+    method: 'DELETE',
+    signal,
+  });
+}

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { getTask } from '../api';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import ConfirmDialog from '../../../components/ConfirmDialog';
+import { deleteTask, getTask } from '../api';
 import PriorityBadge from '../components/PriorityBadge';
 import '../tasks.css';
 
@@ -33,11 +34,23 @@ function formatCreatedDate(value) {
 
 function TaskDetailsPage() {
   const { taskId } = useParams();
+  const navigate = useNavigate();
   const [task, setTask] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [isNotFound, setIsNotFound] = useState(false);
   const [requestVersion, setRequestVersion] = useState(0);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const deleteControllerRef = useRef(null);
+
+  useEffect(
+    () => () => {
+      deleteControllerRef.current?.abort();
+    },
+    [],
+  );
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -82,6 +95,58 @@ function TaskDetailsPage() {
 
   function handleRetry() {
     setRequestVersion((currentVersion) => currentVersion + 1);
+  }
+
+  function handleDeleteRequest() {
+    setDeleteError('');
+    setIsDeleteDialogOpen(true);
+  }
+
+  function handleDeleteCancel() {
+    if (isDeleting) {
+      return;
+    }
+
+    setDeleteError('');
+    setIsDeleteDialogOpen(false);
+  }
+
+  async function handleDeleteConfirm() {
+    if (!task || isDeleting) {
+      return;
+    }
+
+    const abortController = new AbortController();
+    deleteControllerRef.current = abortController;
+    setIsDeleting(true);
+    setDeleteError('');
+
+    try {
+      await deleteTask(taskId, { signal: abortController.signal });
+
+      if (abortController.signal.aborted) {
+        return;
+      }
+
+      setIsDeleteDialogOpen(false);
+      navigate('/tasks');
+    } catch (error) {
+      if (abortController.signal.aborted) {
+        return;
+      }
+
+      setDeleteError(
+        error?.message || 'The task could not be deleted. Please try again.',
+      );
+    } finally {
+      if (
+        deleteControllerRef.current === abortController &&
+        !abortController.signal.aborted
+      ) {
+        deleteControllerRef.current = null;
+        setIsDeleting(false);
+      }
+    }
   }
 
   let content;
@@ -139,6 +204,13 @@ function TaskDetailsPage() {
             <Link className="button" to={`/tasks/${taskId}/edit`}>
               Edit task
             </Link>
+            <button
+              className="button button--danger"
+              onClick={handleDeleteRequest}
+              type="button"
+            >
+              Delete
+            </button>
           </div>
         </header>
 
@@ -175,6 +247,21 @@ function TaskDetailsPage() {
     <main className="tasks-page">
       <div className="tasks-page__container tasks-page__container--form">
         {content}
+        <ConfirmDialog
+          cancelLabel="Cancel"
+          confirmLabel="Delete"
+          error={deleteError}
+          isConfirming={isDeleting}
+          isOpen={isDeleteDialogOpen}
+          message={
+            task
+              ? `Delete "${task.title}"? This action cannot be undone.`
+              : ''
+          }
+          onCancel={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          title="Delete task"
+        />
       </div>
     </main>
   );

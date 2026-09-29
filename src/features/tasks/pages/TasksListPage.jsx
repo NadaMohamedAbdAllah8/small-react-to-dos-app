@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getTasks } from '../api';
+import ConfirmDialog from '../../../components/ConfirmDialog';
+import { deleteTask, getTasks } from '../api';
 import TaskList from '../components/TaskList';
 import TasksEmptyState from '../components/TasksEmptyState';
 import TasksToolbar from '../components/TasksToolbar';
@@ -12,6 +13,9 @@ function TasksListPage() {
   const [requestError, setRequestError] = useState(null);
   const [searchValue, setSearchValue] = useState('');
   const [requestVersion, setRequestVersion] = useState(0);
+  const [taskToDelete, setTaskToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -48,6 +52,44 @@ function TasksListPage() {
     setRequestVersion((currentVersion) => currentVersion + 1);
   }
 
+  function handleDeleteRequest(task) {
+    setDeleteError('');
+    setTaskToDelete(task);
+  }
+
+  function handleDeleteCancel() {
+    if (isDeleting) {
+      return;
+    }
+
+    setDeleteError('');
+    setTaskToDelete(null);
+  }
+
+  async function handleDeleteConfirm() {
+    if (!taskToDelete || isDeleting) {
+      return;
+    }
+
+    const taskId = taskToDelete.id;
+    setIsDeleting(true);
+    setDeleteError('');
+
+    try {
+      await deleteTask(taskId);
+      setTasks((currentTasks) =>
+        currentTasks.filter((task) => task.id !== taskId),
+      );
+      setTaskToDelete(null);
+    } catch (error) {
+      setDeleteError(
+        error?.message || 'The task could not be deleted. Please try again.',
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   const normalizedSearchValue = searchValue.trim().toLocaleLowerCase();
   const filteredTasks = tasks.filter((task) =>
     task.title.toLocaleLowerCase().includes(normalizedSearchValue),
@@ -75,7 +117,9 @@ function TasksListPage() {
   } else if (filteredTasks.length === 0) {
     taskContent = <TasksEmptyState searchValue={searchValue} />;
   } else {
-    taskContent = <TaskList tasks={filteredTasks} />;
+    taskContent = (
+      <TaskList onDelete={handleDeleteRequest} tasks={filteredTasks} />
+    );
   }
 
   return (
@@ -97,6 +141,22 @@ function TasksListPage() {
         />
 
         {taskContent}
+
+        <ConfirmDialog
+          cancelLabel="Cancel"
+          confirmLabel="Delete"
+          error={deleteError}
+          isConfirming={isDeleting}
+          isOpen={Boolean(taskToDelete)}
+          message={
+            taskToDelete
+              ? `Delete "${taskToDelete.title}"? This action cannot be undone.`
+              : ''
+          }
+          onCancel={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          title="Delete task"
+        />
       </div>
     </main>
   );
