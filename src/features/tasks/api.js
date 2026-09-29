@@ -23,6 +23,15 @@ function assertTaskResponse(task, message) {
   return task;
 }
 
+export async function getTask(taskId, { signal } = {}) {
+  const task = await request(`/tasks/${encodeURIComponent(taskId)}`, { signal });
+
+  return assertTaskResponse(
+    task,
+    'The task API response must include a numeric id.',
+  );
+}
+
 export async function createTask(taskPayload, { signal } = {}) {
   const createdTask = await request('/tasks', {
     method: 'POST',
@@ -40,5 +49,24 @@ export async function createTask(taskPayload, { signal } = {}) {
   return assertTaskResponse(
     createdTask,
     'The created task response must include a numeric id.',
+  );
+}
+
+export async function updateTask(taskId, taskPayload, { signal } = {}) {
+  const updatedTask = await request(`/tasks/${encodeURIComponent(taskId)}`, {
+    method: 'PATCH',
+    signal,
+    body: {
+      title: taskPayload.title,
+      description: taskPayload.description,
+      priority: taskPayload.priority,
+      due_date: taskPayload.due_date,
+      is_completed: taskPayload.is_completed,
+    },
+  });
+
+  return assertTaskResponse(
+    updatedTask,
+    'The updated task response must include a numeric id.',
   );
 }
