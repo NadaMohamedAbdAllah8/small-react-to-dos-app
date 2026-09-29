@@ -9,3 +9,36 @@ export async function getTasks({ signal } = {}) {
 
   return tasks;
 }
+
+function assertTaskResponse(task, message) {
+  if (
+    !task ||
+    typeof task !== 'object' ||
+    Array.isArray(task) ||
+    !Number.isFinite(task.id)
+  ) {
+    throw new Error(message);
+  }
+
+  return task;
+}
+
+export async function createTask(taskPayload, { signal } = {}) {
+  const createdTask = await request('/tasks', {
+    method: 'POST',
+    signal,
+    body: {
+      title: taskPayload.title,
+      description: taskPayload.description,
+      priority: taskPayload.priority,
+      due_date: taskPayload.due_date,
+      is_completed: taskPayload.is_completed,
+      created_at: new Date().toISOString(),
+    },
+  });
+
+  return assertTaskResponse(
+    createdTask,
+    'The created task response must include a numeric id.',
+  );
+}
