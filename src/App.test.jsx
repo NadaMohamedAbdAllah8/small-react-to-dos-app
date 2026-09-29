@@ -51,4 +51,26 @@ describe('App', () => {
       await screen.findByRole('heading', { name: 'Edit task' }),
     ).toBeInTheDocument();
   });
+
+  it('routes task details to the details page', async () => {
+    getTask.mockResolvedValue({
+      id: 7,
+      title: 'Route details task',
+      description: null,
+      priority: 'medium',
+      due_date: null,
+      is_completed: false,
+      created_at: '2026-09-29T08:00:00.000Z',
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/tasks/7']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Route details task' }),
+    ).toBeInTheDocument();
+  });
 });
