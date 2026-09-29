@@ -1,4 +1,11 @@
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   MemoryRouter,
@@ -7,10 +14,11 @@ import {
   useNavigate,
 } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getTask } from '../api';
+import { deleteTask, getTask } from '../api';
 import TaskDetailsPage from './TaskDetailsPage';
 
 vi.mock('../api', () => ({
+  deleteTask: vi.fn(),
   getTask: vi.fn(),
 }));
 
@@ -39,10 +47,24 @@ function TaskSwitcher() {
   );
 }
 
-function renderDetailsPage({ includeSwitcher = false } = {}) {
+function PageSwitcher() {
+  const navigate = useNavigate();
+
+  return (
+    <button onClick={() => navigate('/outside')} type="button">
+      Leave details page
+    </button>
+  );
+}
+
+function renderDetailsPage({
+  includeSwitcher = false,
+  includePageSwitcher = false,
+} = {}) {
   render(
     <MemoryRouter initialEntries={['/tasks/42']}>
       {includeSwitcher ? <TaskSwitcher /> : null}
+      {includePageSwitcher ? <PageSwitcher /> : null}
       <Routes>
         <Route element={<TaskDetailsPage />} path="/tasks/:taskId" />
         <Route element={<h1>Tasks list</h1>} path="/tasks" />
@@ -121,6 +143,116 @@ describe('TaskDetailsPage', () => {
     expect(
       await screen.findByRole('heading', { name: 'Task editor' }),
     ).toBeInTheDocument();
+  });
+
+  it('opens deletion confirmation and cancels without deleting', async () => {
+    const user = userEvent.setup();
+    getTask.mockResolvedValue(loadedTask);
+    renderDetailsPage();
+
+    await screen.findByRole('heading', { name: loadedTask.title });
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(
+      screen.getByRole('dialog', { name: 'Delete task' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Delete "Prepare API documentation"/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(deleteTask).not.toHaveBeenCalled();
+  });
+
+  it('deletes once, keeps the page visible while pending, and navigates after success', async () => {
+    const user = userEvent.setup();
+    let resolveDelete;
+    deleteTask.mockReturnValue(
+      new Promise((resolve) => {
+        resolveDelete = resolve;
+      }),
+    );
+    getTask.mockResolvedValue(loadedTask);
+    renderDetailsPage();
+
+    await screen.findByRole('heading', { name: loadedTask.title });
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }),
+    );
+
+    expect(deleteTask).toHaveBeenCalledTimes(1);
+    expect(deleteTask).toHaveBeenCalledWith('42', {
+      signal: expect.any(AbortSignal),
+    });
+    expect(screen.getByRole('heading', { name: loadedTask.title })).toBeInTheDocument();
+    const pendingButton = screen.getByRole('button', { name: 'Deleting...' });
+    expect(pendingButton).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+
+    await user.click(pendingButton);
+    expect(deleteTask).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveDelete(null);
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'Tasks list' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('keeps the task and dialog visible when deletion fails', async () => {
+    const user = userEvent.setup();
+    deleteTask.mockRejectedValue(new Error('The deletion request failed.'));
+    getTask.mockResolvedValue(loadedTask);
+    renderDetailsPage();
+
+    await screen.findByRole('heading', { name: loadedTask.title });
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }),
+    );
+
+    expect(
+      await screen.findByText('The deletion request failed.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: loadedTask.title })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }),
+    ).toBeEnabled();
+  });
+
+  it('aborts pending deletion and does not navigate after leaving', async () => {
+    const user = userEvent.setup();
+    let resolveDelete;
+    let requestSignal;
+    deleteTask.mockImplementation(
+      (_taskId, { signal }) =>
+        new Promise((resolve) => {
+          requestSignal = signal;
+          resolveDelete = resolve;
+        }),
+    );
+    getTask.mockResolvedValue(loadedTask);
+    renderDetailsPage({ includePageSwitcher: true });
+
+    await screen.findByRole('heading', { name: loadedTask.title });
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }),
+    );
+    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByRole('button', { name: 'Leave details page' }));
+    expect(await screen.findByRole('heading', { name: 'Other page' })).toBeInTheDocument();
+    expect(requestSignal.aborted).toBe(true);
+
+    await act(async () => {
+      resolveDelete(null);
+    });
+    expect(screen.getByRole('heading', { name: 'Other page' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Tasks list' })).not.toBeInTheDocument();
   });
 
   it('shows a specific not-found state for a 404 response', async () => {

@@ -21,3 +21,68 @@ input,
 select {
   font: inherit;
 }
+
+.button--danger {
+  color: #ffffff;
+  background: #9b2c2c;
+  border-color: #9b2c2c;
+}
+
+.button--danger:hover {
+  background: #742a2a;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.confirm-dialog__backdrop {
+  position: fixed;
+  z-index: 10;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(17 24 39 / 55%);
+}
+
+.confirm-dialog {
+  width: min(100%, 30rem);
+  padding: 2rem;
+  background: #ffffff;
+  border: 1px solid #7b8794;
+  border-radius: 0.45rem;
+  box-shadow: 0 1.5rem 3rem rgb(17 24 39 / 25%);
+}
+
+.confirm-dialog:focus {
+  outline: none;
+}
+
+.confirm-dialog h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.confirm-dialog p {
+  margin: 1rem 0 0;
+  color: #3e4c59;
+  line-height: 1.5;
+}
+
+.confirm-dialog__error {
+  padding: 0.75rem;
+  margin-top: 1rem;
+  color: #7f1d1d;
+  background: #fef2f2;
+  border: 1px solid #9b2c2c;
+  border-radius: 0.4rem;
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}

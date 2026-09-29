@@ -17,7 +17,7 @@ function formatDate(value) {
   return dateFormatter.format(new Date(normalizedValue));
 }
 
-function TaskListItem({ task }) {
+function TaskListItem({ task, onDelete }) {
   const completionLabel = task.is_completed
     ? `${task.title} is completed`
     : `${task.title} is not completed`;
@@ -54,6 +54,14 @@ function TaskListItem({ task }) {
         >
           View
         </Link>
+        <button
+          aria-label={`Delete ${task.title}`}
+          className="task-row__action-link task-row__action-link--danger"
+          onClick={() => onDelete(task)}
+          type="button"
+        >
+          Delete
+        </button>
       </td>
     </tr>
   );
