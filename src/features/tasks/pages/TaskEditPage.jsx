@@ -22,7 +22,7 @@ function TaskEditPage() {
     () => () => {
       mutationControllerRef.current?.abort();
     },
-    [],
+    [taskId],
   );
 
   useEffect(() => {
@@ -33,6 +33,9 @@ function TaskEditPage() {
       setIsLoading(true);
       setLoadError(null);
       setIsNotFound(false);
+      setIsSubmitting(false);
+      setRequestError('');
+      setServerErrors({});
 
       try {
         const loadedTask = await getTask(taskId, {

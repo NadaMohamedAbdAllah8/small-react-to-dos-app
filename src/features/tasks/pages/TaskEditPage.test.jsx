@@ -1,6 +1,5 @@
 import {
   act,
-  cleanup,
   fireEvent,
   render,
   screen,
@@ -14,7 +13,7 @@ import {
   useNavigate,
   useParams,
 } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { getTask, updateTask } from '../api';
 import TaskEditPage from './TaskEditPage';
 
@@ -22,11 +21,6 @@ vi.mock('../api', () => ({
   getTask: vi.fn(),
   updateTask: vi.fn(),
 }));
-
-afterEach(() => {
-  cleanup();
-  vi.clearAllMocks();
-});
 
 const loadedTask = {
   id: 7,
@@ -177,11 +171,25 @@ describe('TaskEditPage', () => {
     await user.type(titleInput, 'Keep edited title');
     await user.click(screen.getByRole('button', { name: 'Update task' }));
 
-    expect(await screen.findByRole('alert', { name: '' })).toHaveTextContent(
+    expect(await screen.findByRole('alert')).toHaveTextContent(
       'The update request failed.',
     );
     expect(titleInput).toHaveValue('Keep edited title');
     expect(screen.getByRole('button', { name: 'Update task' })).toBeEnabled();
+  });
+
+  it('shows the fallback update failure when no message is available', async () => {
+    const user = userEvent.setup();
+    getTask.mockResolvedValue(loadedTask);
+    updateTask.mockRejectedValue({});
+    renderEditPage();
+
+    await screen.findByLabelText(/title/i);
+    await user.click(screen.getByRole('button', { name: 'Update task' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The task could not be updated. Please try again.',
+    );
   });
 
   it('renders normalized Laravel validation errors', async () => {
@@ -300,5 +308,38 @@ describe('TaskEditPage', () => {
     });
     expect(screen.getByRole('heading', { name: 'Other page' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Task 7' })).not.toBeInTheDocument();
+  });
+
+  it('aborts a pending update when switching to another task', async () => {
+    const user = userEvent.setup();
+    let resolveUpdate;
+    let requestSignal;
+    getTask.mockImplementation((taskId) =>
+      Promise.resolve({
+        ...loadedTask,
+        id: Number(taskId),
+        title: taskId === '7' ? loadedTask.title : 'Current task',
+      }),
+    );
+    updateTask.mockImplementation(
+      (_taskId, _taskPayload, { signal }) =>
+        new Promise((resolve) => {
+          requestSignal = signal;
+          resolveUpdate = resolve;
+        }),
+    );
+    renderEditPage({ includeSwitcher: true });
+
+    await screen.findByLabelText(/title/i);
+    await user.click(screen.getByRole('button', { name: 'Update task' }));
+    await user.click(screen.getByRole('button', { name: 'Edit task 2' }));
+
+    expect(requestSignal.aborted).toBe(true);
+    expect(await screen.findByLabelText(/title/i)).toHaveValue('Current task');
+
+    await act(async () => {
+      resolveUpdate(loadedTask);
+    });
+    expect(screen.getByLabelText(/title/i)).toHaveValue('Current task');
   });
 });
