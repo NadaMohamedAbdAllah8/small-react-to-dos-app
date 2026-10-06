@@ -1,6 +1,5 @@
 import {
   act,
-  cleanup,
   fireEvent,
   render,
   screen,
@@ -14,18 +13,13 @@ import {
   useNavigate,
   useParams,
 } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createTask } from '../api';
 import TaskCreatePage from './TaskCreatePage';
 
 vi.mock('../api', () => ({
   createTask: vi.fn(),
 }));
-
-afterEach(() => {
-  cleanup();
-  vi.clearAllMocks();
-});
 
 function TaskDetailsTestPage() {
   const { taskId } = useParams();
@@ -107,11 +101,24 @@ describe('TaskCreatePage', () => {
     await user.type(titleInput, 'Keep this draft');
     await user.click(screen.getByRole('button', { name: 'Save task' }));
 
-    expect(
-      await screen.findByRole('alert', { name: '' }),
-    ).toHaveTextContent('Unable to connect to the API.');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to connect to the API.',
+    );
     expect(titleInput).toHaveValue('Keep this draft');
     expect(screen.getByRole('button', { name: 'Save task' })).toBeEnabled();
+  });
+
+  it('shows the fallback failure when no error message is available', async () => {
+    const user = userEvent.setup();
+    createTask.mockRejectedValue({});
+    renderCreatePage();
+
+    await user.type(screen.getByLabelText(/title/i), 'Valid task');
+    await user.click(screen.getByRole('button', { name: 'Save task' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The task could not be created. Please try again.',
+    );
   });
 
   it('renders normalized Laravel validation errors beside their fields', async () => {
