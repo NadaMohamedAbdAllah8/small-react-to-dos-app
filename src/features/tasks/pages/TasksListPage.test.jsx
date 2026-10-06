@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   MemoryRouter,
@@ -7,7 +7,7 @@ import {
   useNavigate,
   useParams,
 } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { deleteTask, getTasks } from '../api';
 import TasksListPage from './TasksListPage';
 
@@ -15,11 +15,6 @@ vi.mock('../api', () => ({
   deleteTask: vi.fn(),
   getTasks: vi.fn(),
 }));
-
-afterEach(() => {
-  cleanup();
-  vi.clearAllMocks();
-});
 
 const tasks = [
   {
@@ -130,6 +125,23 @@ describe('TasksListPage loading and navigation', () => {
     expect(getTasks).toHaveBeenCalledTimes(2);
   });
 
+  it('shows the fallback message for a load error without a message', async () => {
+    getTasks.mockRejectedValue({});
+    renderListPage(undefined, { mockLoad: false });
+
+    expect(
+      await screen.findByText('The tasks could not be loaded.'),
+    ).toBeInTheDocument();
+  });
+
+  it('links to task creation', async () => {
+    renderListPage();
+
+    expect(
+      await screen.findByRole('link', { name: 'Add task' }),
+    ).toHaveAttribute('href', '/tasks/new');
+  });
+
   it('filters tasks and reports when no task matches', async () => {
     const user = userEvent.setup();
     renderListPage();
@@ -230,7 +242,9 @@ describe('TasksListPage deletion', () => {
     await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     expect(deleteTask).toHaveBeenCalledTimes(1);
-    expect(deleteTask).toHaveBeenCalledWith(1);
+    expect(deleteTask).toHaveBeenCalledWith(1, {
+      signal: expect.any(AbortSignal),
+    });
     expect(screen.getByRole('link', { name: 'Alpha task' })).toBeInTheDocument();
     const pendingButton = screen.getByRole('button', { name: 'Deleting...' });
     expect(pendingButton).toBeDisabled();
@@ -285,7 +299,74 @@ describe('TasksListPage deletion', () => {
       await screen.findByRole('heading', { name: 'No matching tasks' }),
     ).toBeInTheDocument();
     expect(searchInput).toHaveValue('Beta');
-    expect(deleteTask).toHaveBeenCalledWith(2);
+    expect(deleteTask).toHaveBeenCalledWith(2, {
+      signal: expect.any(AbortSignal),
+    });
     expect(getTasks).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the collection empty state after deleting the final task', async () => {
+    const user = userEvent.setup();
+    deleteTask.mockResolvedValue(null);
+    renderListPage([tasks[0]]);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Delete Alpha task' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'No tasks yet' }),
+    ).toBeInTheDocument();
+  });
+
+  it('retries deletion after a failure', async () => {
+    const user = userEvent.setup();
+    deleteTask
+      .mockRejectedValueOnce(new Error('Temporary deletion failure.'))
+      .mockResolvedValueOnce(null);
+    renderListPage();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Delete Alpha task' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(await screen.findByText('Temporary deletion failure.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('link', { name: 'Alpha task' })).not.toBeInTheDocument();
+    });
+    expect(deleteTask).toHaveBeenCalledTimes(2);
+  });
+
+  it('aborts pending deletion and ignores its result after leaving', async () => {
+    const user = userEvent.setup();
+    let resolveDelete;
+    let requestSignal;
+    deleteTask.mockImplementation(
+      (_taskId, { signal }) =>
+        new Promise((resolve) => {
+          requestSignal = signal;
+          resolveDelete = resolve;
+        }),
+    );
+    renderListPage(undefined, { includeSwitcher: true });
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Delete Alpha task' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole('button', { name: 'Leave task list' }));
+
+    expect(await screen.findByRole('heading', { name: 'Other page' })).toBeInTheDocument();
+    expect(requestSignal.aborted).toBe(true);
+
+    await act(async () => {
+      resolveDelete(null);
+    });
+    expect(screen.getByRole('heading', { name: 'Other page' })).toBeInTheDocument();
   });
 });
