@@ -1,6 +1,5 @@
 import {
   act,
-  cleanup,
   render,
   screen,
   waitFor,
@@ -13,7 +12,7 @@ import {
   Routes,
   useNavigate,
 } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { deleteTask, getTask } from '../api';
 import TaskDetailsPage from './TaskDetailsPage';
 
@@ -21,11 +20,6 @@ vi.mock('../api', () => ({
   deleteTask: vi.fn(),
   getTask: vi.fn(),
 }));
-
-afterEach(() => {
-  cleanup();
-  vi.clearAllMocks();
-});
 
 const loadedTask = {
   id: 42,
@@ -117,6 +111,21 @@ describe('TaskDetailsPage', () => {
     expect(screen.getByText('No due date')).toBeInTheDocument();
     expect(screen.getByText('In progress')).toBeInTheDocument();
     expect(screen.getByText('Not completed')).toBeInTheDocument();
+  });
+
+  it('renders malformed dates without crashing the page', async () => {
+    getTask.mockResolvedValue({
+      ...loadedTask,
+      due_date: '2026-02-30',
+      created_at: 'not-a-date',
+    });
+
+    renderDetailsPage();
+
+    expect(await screen.findAllByText('Invalid date')).toHaveLength(2);
+    expect(
+      screen.getByRole('heading', { name: loadedTask.title }),
+    ).toBeInTheDocument();
   });
 
   it('navigates back to the task list', async () => {
@@ -223,6 +232,23 @@ describe('TaskDetailsPage', () => {
     ).toBeEnabled();
   });
 
+  it('shows the fallback deletion error when no message is available', async () => {
+    const user = userEvent.setup();
+    deleteTask.mockRejectedValue({});
+    getTask.mockResolvedValue(loadedTask);
+    renderDetailsPage();
+
+    await screen.findByRole('heading', { name: loadedTask.title });
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }),
+    );
+
+    expect(
+      await screen.findByText('The task could not be deleted. Please try again.'),
+    ).toBeInTheDocument();
+  });
+
   it('aborts pending deletion and does not navigate after leaving', async () => {
     const user = userEvent.setup();
     let resolveDelete;
@@ -255,6 +281,44 @@ describe('TaskDetailsPage', () => {
     expect(screen.queryByRole('heading', { name: 'Tasks list' })).not.toBeInTheDocument();
   });
 
+  it('aborts pending deletion when switching to another task', async () => {
+    const user = userEvent.setup();
+    let resolveDelete;
+    let requestSignal;
+    getTask.mockImplementation((taskId) =>
+      Promise.resolve({
+        ...loadedTask,
+        id: Number(taskId),
+        title: taskId === '42' ? loadedTask.title : 'Current task',
+      }),
+    );
+    deleteTask.mockImplementation(
+      (_taskId, { signal }) =>
+        new Promise((resolve) => {
+          requestSignal = signal;
+          resolveDelete = resolve;
+        }),
+    );
+    renderDetailsPage({ includeSwitcher: true });
+
+    await screen.findByRole('heading', { name: loadedTask.title });
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'View task 43' }));
+
+    expect(requestSignal.aborted).toBe(true);
+    expect(
+      await screen.findByRole('heading', { name: 'Current task' }),
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      resolveDelete(null);
+    });
+    expect(screen.getByRole('heading', { name: 'Current task' })).toBeInTheDocument();
+  });
+
   it('shows a specific not-found state for a 404 response', async () => {
     getTask.mockRejectedValue({ status: 404 });
 
@@ -276,6 +340,16 @@ describe('TaskDetailsPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Unable to connect to the API.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
+  });
+
+  it('shows the fallback load error when no message is available', async () => {
+    getTask.mockRejectedValue({});
+
+    renderDetailsPage();
+
+    expect(
+      await screen.findByText('The task could not be loaded.'),
+    ).toBeInTheDocument();
   });
 
   it('retries loading after an API error', async () => {

@@ -1,10 +1,7 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { validateTask } from '../validation';
+import { describe, expect, it, vi } from 'vitest';
 import TaskForm from './TaskForm';
-
-afterEach(cleanup);
 
 const defaultProps = {
   initialValues: {},
@@ -67,20 +64,6 @@ describe('TaskForm', () => {
     expect(screen.getByLabelText(/completed/i)).toBeChecked();
   });
 
-  it('validates all rules defined by the API contract', () => {
-    expect(
-      validateTask({ title: '   ', priority: 'urgent', due_date: '2026-02-29' }),
-    ).toEqual({
-      title: 'Title is required.',
-      priority: 'Choose a valid priority.',
-      due_date: 'Enter a valid due date.',
-    });
-
-    expect(
-      validateTask({ title: 'Valid', priority: 'medium', due_date: '2028-02-29' }),
-    ).toEqual({});
-  });
-
   it('does not submit invalid data, focuses the first invalid field, and clears its corrected error', async () => {
     const user = userEvent.setup();
     const { onSubmit } = renderTaskForm();
@@ -139,6 +122,19 @@ describe('TaskForm', () => {
     expect(screen.getByText('The due date must be in the future.')).toBeInTheDocument();
     expect(screen.getByLabelText(/title/i)).toHaveAccessibleDescription(
       'The title has already been taken.',
+    );
+  });
+
+  it('associates client and server errors with the same field', async () => {
+    const user = userEvent.setup();
+    renderTaskForm({
+      serverErrors: { title: 'The server rejected this title.' },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Save task' }));
+
+    expect(screen.getByLabelText(/title/i)).toHaveAccessibleDescription(
+      'Title is required. The server rejected this title.',
     );
   });
 

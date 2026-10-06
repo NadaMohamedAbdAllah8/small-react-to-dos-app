@@ -3,34 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import { deleteTask, getTask } from '../api';
 import PriorityBadge from '../components/PriorityBadge';
+import { formatTaskCreatedDate, formatTaskDueDate } from '../formatters';
 import '../tasks.css';
-
-const dateFormatter = new Intl.DateTimeFormat('en-US', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
-
-const timeFormatter = new Intl.DateTimeFormat('en-US', {
-  hour: '2-digit',
-  minute: '2-digit',
-  timeZone: 'UTC',
-});
-
-function formatDueDate(value) {
-  if (!value) {
-    return 'No due date';
-  }
-
-  const normalizedValue = value.length === 10 ? `${value}T00:00:00Z` : value;
-  return dateFormatter.format(new Date(normalizedValue));
-}
-
-function formatCreatedDate(value) {
-  const date = new Date(value);
-  return `${dateFormatter.format(date)} at ${timeFormatter.format(date)}`;
-}
 
 function TaskDetailsPage() {
   const { taskId } = useParams();
@@ -49,7 +23,7 @@ function TaskDetailsPage() {
     () => () => {
       deleteControllerRef.current?.abort();
     },
-    [],
+    [taskId],
   );
 
   useEffect(() => {
@@ -60,6 +34,9 @@ function TaskDetailsPage() {
       setIsLoading(true);
       setLoadError(null);
       setIsNotFound(false);
+      setIsDeleteDialogOpen(false);
+      setIsDeleting(false);
+      setDeleteError('');
 
       try {
         const loadedTask = await getTask(taskId, {
@@ -228,11 +205,11 @@ function TaskDetailsPage() {
           </div>
           <div className="task-details__metadata-item">
             <dt>Due date</dt>
-            <dd>{formatDueDate(task.due_date)}</dd>
+            <dd>{formatTaskDueDate(task.due_date)}</dd>
           </div>
           <div className="task-details__metadata-item">
             <dt>Created</dt>
-            <dd>{formatCreatedDate(task.created_at)}</dd>
+            <dd>{formatTaskCreatedDate(task.created_at)}</dd>
           </div>
           <div className="task-details__metadata-item">
             <dt>Status</dt>

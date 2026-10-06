@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
+import NotFoundPage from './components/NotFoundPage';
 import TaskCreatePage from './features/tasks/pages/TaskCreatePage';
 import TaskDetailsPage from './features/tasks/pages/TaskDetailsPage';
 import TaskEditPage from './features/tasks/pages/TaskEditPage';
@@ -12,6 +13,7 @@ function App() {
       <Route element={<TaskCreatePage />} path="/tasks/new" />
       <Route element={<TaskEditPage />} path="/tasks/:taskId/edit" />
       <Route element={<TaskDetailsPage />} path="/tasks/:taskId" />
+      <Route element={<NotFoundPage />} path="*" />
     </Routes>
   );
 }

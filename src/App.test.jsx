@@ -1,7 +1,7 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getTask } from './features/tasks/api';
+import { describe, expect, it, vi } from 'vitest';
+import { getTask, getTasks } from './features/tasks/api';
 import App from './App';
 
 vi.mock('./features/tasks/api', () => ({
@@ -12,12 +12,32 @@ vi.mock('./features/tasks/api', () => ({
   updateTask: vi.fn(),
 }));
 
-afterEach(() => {
-  cleanup();
-  vi.clearAllMocks();
-});
-
 describe('App', () => {
+  it('redirects the root route to the task list', async () => {
+    getTasks.mockResolvedValue([]);
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'No tasks yet' }),
+    ).toBeInTheDocument();
+  });
+
+  it('routes the task collection to the list page', async () => {
+    getTasks.mockResolvedValue([]);
+    render(
+      <MemoryRouter initialEntries={['/tasks']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Tasks' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'No tasks yet' })).toBeInTheDocument();
+  });
+
   it('routes task creation to the create page', () => {
     render(
       <MemoryRouter initialEntries={['/tasks/new']}>
@@ -71,6 +91,18 @@ describe('App', () => {
 
     expect(
       await screen.findByRole('heading', { name: 'Route details task' }),
+    ).toBeInTheDocument();
+  });
+
+  it('renders the not-found page for an unknown route', () => {
+    render(
+      <MemoryRouter initialEntries={['/unknown-route']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Page not found' }),
     ).toBeInTheDocument();
   });
 });

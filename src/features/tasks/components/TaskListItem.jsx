@@ -1,21 +1,6 @@
 import { Link } from 'react-router-dom';
+import { formatTaskListDate } from '../formatters';
 import PriorityBadge from './PriorityBadge';
-
-const dateFormatter = new Intl.DateTimeFormat('en-US', {
-  day: '2-digit',
-  month: 'short',
-  timeZone: 'UTC',
-});
-
-function formatDate(value) {
-  if (!value) {
-    return 'No date';
-  }
-
-  const normalizedValue = value.length === 10 ? `${value}T00:00:00Z` : value;
-
-  return dateFormatter.format(new Date(normalizedValue));
-}
 
 function TaskListItem({ task, onDelete }) {
   const completionLabel = task.is_completed
@@ -44,8 +29,8 @@ function TaskListItem({ task, onDelete }) {
       <td data-label="Priority">
         <PriorityBadge priority={task.priority} />
       </td>
-      <td data-label="Created">{formatDate(task.created_at)}</td>
-      <td data-label="Due">{formatDate(task.due_date)}</td>
+      <td data-label="Created">{formatTaskListDate(task.created_at)}</td>
+      <td data-label="Due">{formatTaskListDate(task.due_date)}</td>
       <td className="task-row__actions" data-label="Actions">
         <Link
           aria-label={`View ${task.title}`}

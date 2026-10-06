@@ -1,14 +1,32 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { request } from '../../api/client';
-import { createTask, deleteTask, getTask, updateTask } from './api';
+import { createTask, deleteTask, getTask, getTasks, updateTask } from './api';
 
 vi.mock('../../api/client', () => ({
   request: vi.fn(),
 }));
 
-afterEach(() => {
-  vi.clearAllMocks();
-  vi.useRealTimers();
+describe('getTasks', () => {
+  it('loads the collection and forwards the abort signal', async () => {
+    const tasks = [{ id: 1, title: 'Task' }];
+    const abortController = new AbortController();
+    request.mockResolvedValue(tasks);
+
+    await expect(
+      getTasks({ signal: abortController.signal }),
+    ).resolves.toBe(tasks);
+    expect(request).toHaveBeenCalledWith('/tasks', {
+      signal: abortController.signal,
+    });
+  });
+
+  it('rejects a non-array collection response', async () => {
+    request.mockResolvedValue({ data: [] });
+
+    await expect(getTasks()).rejects.toThrow(
+      'The tasks API response must be an array.',
+    );
+  });
 });
 
 describe('createTask', () => {
@@ -84,6 +102,17 @@ describe('getTask', () => {
     });
     expect(result).toBe(task);
   });
+
+  it('encodes the task id and rejects a response without a numeric id', async () => {
+    request.mockResolvedValue({ id: '7', title: 'Invalid task' });
+
+    await expect(getTask('task/7')).rejects.toThrow(
+      'The task API response must include a numeric id.',
+    );
+    expect(request).toHaveBeenCalledWith('/tasks/task%2F7', {
+      signal: undefined,
+    });
+  });
 });
 
 describe('updateTask', () => {
@@ -126,6 +155,20 @@ describe('updateTask', () => {
       },
     });
     expect(result).toBe(updatedTask);
+  });
+
+  it('rejects an updated-task response without a numeric id', async () => {
+    request.mockResolvedValue(null);
+
+    await expect(
+      updateTask('7', {
+        title: 'Task',
+        description: null,
+        priority: 'medium',
+        due_date: null,
+        is_completed: false,
+      }),
+    ).rejects.toThrow('The updated task response must include a numeric id.');
   });
 });
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import { deleteTask, getTasks } from '../api';
@@ -16,6 +16,14 @@ function TasksListPage() {
   const [taskToDelete, setTaskToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const deleteControllerRef = useRef(null);
+
+  useEffect(
+    () => () => {
+      deleteControllerRef.current?.abort();
+    },
+    [],
+  );
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -72,21 +80,38 @@ function TasksListPage() {
     }
 
     const taskId = taskToDelete.id;
+    const abortController = new AbortController();
+    deleteControllerRef.current = abortController;
     setIsDeleting(true);
     setDeleteError('');
 
     try {
-      await deleteTask(taskId);
+      await deleteTask(taskId, { signal: abortController.signal });
+
+      if (abortController.signal.aborted) {
+        return;
+      }
+
       setTasks((currentTasks) =>
         currentTasks.filter((task) => task.id !== taskId),
       );
       setTaskToDelete(null);
     } catch (error) {
+      if (abortController.signal.aborted) {
+        return;
+      }
+
       setDeleteError(
         error?.message || 'The task could not be deleted. Please try again.',
       );
     } finally {
-      setIsDeleting(false);
+      if (
+        deleteControllerRef.current === abortController &&
+        !abortController.signal.aborted
+      ) {
+        deleteControllerRef.current = null;
+        setIsDeleting(false);
+      }
     }
   }
 
