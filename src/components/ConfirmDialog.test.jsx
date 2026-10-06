@@ -1,10 +1,8 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
 import ConfirmDialog from './ConfirmDialog';
-
-afterEach(cleanup);
 
 const defaultProps = {
   isOpen: true,
@@ -114,6 +112,18 @@ describe('ConfirmDialog', () => {
 
     expect(onCancel).not.toHaveBeenCalled();
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('keeps focus on the dialog when no pending action is enabled', async () => {
+    const user = userEvent.setup();
+    renderDialog({ isConfirming: true });
+    const dialog = screen.getByRole('dialog');
+
+    expect(dialog).toHaveFocus();
+    await user.tab();
+    expect(dialog).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(dialog).toHaveFocus();
   });
 
   it('renders an error without closing', () => {
