@@ -59,7 +59,23 @@ export async function request(path, { body, headers, ...options } = {}) {
     throw new ApiError('Unable to connect to the API.', { cause: error });
   }
 
-  const data = await parseResponse(response);
+  let data;
+
+  try {
+    data = await parseResponse(response);
+  } catch (error) {
+    if (!response.ok && error instanceof ApiError) {
+      throw new ApiError(
+        `The API request failed with status ${response.status}.`,
+        {
+          status: response.status,
+          cause: error.cause,
+        },
+      );
+    }
+
+    throw error;
+  }
 
   if (!response.ok) {
     const message =
