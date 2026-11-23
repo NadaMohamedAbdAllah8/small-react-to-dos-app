@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { taskFixtures } from '../fixtures/tasks';
-import { apiUrl } from '../mocks/handlers';
+import { apiUrl, createApiResponse } from '../mocks/handlers';
 import { server } from '../mocks/server';
 import { renderApp } from '../test-utils';
 
@@ -110,7 +110,11 @@ describe('task delete flows', () => {
         deletedTaskIds.push(params.taskId);
         return new HttpResponse(null, { status: 204 });
       }),
-      http.get(`${apiUrl}/tasks`, () => HttpResponse.json([taskFixtures[1]])),
+      http.get(`${apiUrl}/tasks`, () =>
+        createApiResponse([taskFixtures[1]], {
+          message: 'Tasks retrieved successfully.',
+        }),
+      ),
     );
     renderApp({ route: '/tasks/1' });
 
