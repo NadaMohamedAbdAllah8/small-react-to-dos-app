@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { createTaskFixture } from '../fixtures/tasks';
-import { apiUrl } from '../mocks/handlers';
+import { apiUrl, createApiResponse } from '../mocks/handlers';
 import { server } from '../mocks/server';
 import { renderApp } from '../test-utils';
 
@@ -26,9 +26,16 @@ describe('task create flows', () => {
         await new Promise((resolve) => {
           releaseCreate = resolve;
         });
-        return HttpResponse.json(createdTask, { status: 201 });
+        return createApiResponse(createdTask, {
+          message: 'Task created successfully.',
+          status: 201,
+        });
       }),
-      http.get(`${apiUrl}/tasks/24`, () => HttpResponse.json(createdTask)),
+      http.get(`${apiUrl}/tasks/24`, () =>
+        createApiResponse(createdTask, {
+          message: 'Task retrieved successfully.',
+        }),
+      ),
     );
     renderApp();
 
@@ -53,9 +60,7 @@ describe('task create flows', () => {
       priority: 'high',
       due_date: '2026-11-15',
       is_completed: true,
-      created_at: expect.any(String),
     });
-    expect(Number.isNaN(Date.parse(requestBodies[0].created_at))).toBe(false);
 
     const pendingButton = screen.getByRole('button', { name: 'Saving...' });
     expect(pendingButton).toBeDisabled();
@@ -77,7 +82,10 @@ describe('task create flows', () => {
     server.use(
       http.post(`${apiUrl}/tasks`, () => {
         postCount += 1;
-        return HttpResponse.json(createTaskFixture({ id: 24 }), { status: 201 });
+        return createApiResponse(createTaskFixture({ id: 24 }), {
+          message: 'Task created successfully.',
+          status: 201,
+        });
       }),
     );
     renderApp({ route: '/tasks/new' });
@@ -106,9 +114,16 @@ describe('task create flows', () => {
               { message: 'The create request failed.' },
               { status: 500 },
             )
-          : HttpResponse.json(createdTask, { status: 201 });
+          : createApiResponse(createdTask, {
+              message: 'Task created successfully.',
+              status: 201,
+            });
       }),
-      http.get(`${apiUrl}/tasks/25`, () => HttpResponse.json(createdTask)),
+      http.get(`${apiUrl}/tasks/25`, () =>
+        createApiResponse(createdTask, {
+          message: 'Task retrieved successfully.',
+        }),
+      ),
     );
     renderApp({ route: '/tasks/new' });
 

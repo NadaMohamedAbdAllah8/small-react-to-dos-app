@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { createTaskFixture } from '../fixtures/tasks';
-import { apiUrl } from '../mocks/handlers';
+import { apiUrl, createApiResponse } from '../mocks/handlers';
 import { server } from '../mocks/server';
 import { renderApp } from '../test-utils';
 
@@ -17,7 +17,9 @@ describe('task edit flows', () => {
     server.use(
       http.get(`${apiUrl}/tasks/:taskId`, ({ params }) => {
         requestedTaskIds.push(params.taskId);
-        return HttpResponse.json(currentTask);
+        return createApiResponse(currentTask, {
+          message: 'Task retrieved successfully.',
+        });
       }),
       http.patch(`${apiUrl}/tasks/7`, async ({ request }) => {
         const body = await request.json();
@@ -26,7 +28,9 @@ describe('task edit flows', () => {
           releaseUpdate = resolve;
         });
         currentTask = { ...currentTask, ...body };
-        return HttpResponse.json(currentTask);
+        return createApiResponse(currentTask, {
+          message: 'Task updated successfully.',
+        });
       }),
     );
     renderApp({ route: '/tasks/7' });
@@ -96,7 +100,11 @@ describe('task edit flows', () => {
     let currentTask = createTaskFixture({ id: 8, title: 'Retry edit' });
     const patchBodies = [];
     server.use(
-      http.get(`${apiUrl}/tasks/8`, () => HttpResponse.json(currentTask)),
+      http.get(`${apiUrl}/tasks/8`, () =>
+        createApiResponse(currentTask, {
+          message: 'Task retrieved successfully.',
+        }),
+      ),
       http.patch(`${apiUrl}/tasks/8`, async ({ request }) => {
         const body = await request.json();
         patchBodies.push(body);
@@ -109,7 +117,9 @@ describe('task edit flows', () => {
         }
 
         currentTask = { ...currentTask, ...body };
-        return HttpResponse.json(currentTask);
+        return createApiResponse(currentTask, {
+          message: 'Task updated successfully.',
+        });
       }),
     );
     renderApp({ route: '/tasks/8/edit' });
