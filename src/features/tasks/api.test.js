@@ -10,7 +10,11 @@ describe('getTasks', () => {
   it('loads the collection and forwards the abort signal', async () => {
     const tasks = [{ id: 1, title: 'Task' }];
     const abortController = new AbortController();
-    request.mockResolvedValue(tasks);
+    request.mockResolvedValue({
+      status: 200,
+      message: 'Tasks retrieved successfully.',
+      data: tasks,
+    });
 
     await expect(
       getTasks({ signal: abortController.signal }),
@@ -20,20 +24,20 @@ describe('getTasks', () => {
     });
   });
 
-  it('rejects a non-array collection response', async () => {
-    request.mockResolvedValue({ data: [] });
+  it.each([
+    ['a missing data field', { status: 200, message: 'Success.' }],
+    ['a non-array data field', { status: 200, message: 'Success.', data: {} }],
+  ])('rejects %s in the collection response', async (_label, response) => {
+    request.mockResolvedValue(response);
 
     await expect(getTasks()).rejects.toThrow(
-      'The tasks API response must be an array.',
+      'The tasks API response must include a data array.',
     );
   });
 });
 
 describe('createTask', () => {
-  it('posts only accepted task fields plus the mock timestamp', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-09-29T10:30:00.000Z'));
-
+  it('posts only editable task fields and unwraps the created task', async () => {
     const createdTask = {
       id: 4,
       title: 'Write create-page tests',
@@ -43,7 +47,11 @@ describe('createTask', () => {
       is_completed: false,
       created_at: '2026-09-29T10:30:00.000Z',
     };
-    request.mockResolvedValue(createdTask);
+    request.mockResolvedValue({
+      status: 201,
+      message: 'Task created successfully.',
+      data: createdTask,
+    });
 
     const abortController = new AbortController();
     const result = await createTask(
@@ -68,14 +76,17 @@ describe('createTask', () => {
         priority: 'medium',
         due_date: null,
         is_completed: false,
-        created_at: '2026-09-29T10:30:00.000Z',
       },
     });
     expect(result).toBe(createdTask);
   });
 
   it('rejects a created-task response without a numeric id', async () => {
-    request.mockResolvedValue({ title: 'Missing id' });
+    request.mockResolvedValue({
+      status: 201,
+      message: 'Task created successfully.',
+      data: { title: 'Missing id' },
+    });
 
     await expect(
       createTask({
@@ -87,13 +98,31 @@ describe('createTask', () => {
       }),
     ).rejects.toThrow('The created task response must include a numeric id.');
   });
+
+  it('rejects a created-task response without a data field', async () => {
+    request.mockResolvedValue({ status: 201, message: 'Success.' });
+
+    await expect(
+      createTask({
+        title: 'Missing data',
+        description: null,
+        priority: 'low',
+        due_date: null,
+        is_completed: false,
+      }),
+    ).rejects.toThrow('The created task response must include task data.');
+  });
 });
 
 describe('getTask', () => {
   it('loads one task and forwards the abort signal', async () => {
     const task = { id: 7, title: 'Loaded task' };
     const abortController = new AbortController();
-    request.mockResolvedValue(task);
+    request.mockResolvedValue({
+      status: 200,
+      message: 'Task retrieved successfully.',
+      data: task,
+    });
 
     const result = await getTask('7', { signal: abortController.signal });
 
@@ -104,7 +133,11 @@ describe('getTask', () => {
   });
 
   it('encodes the task id and rejects a response without a numeric id', async () => {
-    request.mockResolvedValue({ id: '7', title: 'Invalid task' });
+    request.mockResolvedValue({
+      status: 200,
+      message: 'Task retrieved successfully.',
+      data: { id: '7', title: 'Invalid task' },
+    });
 
     await expect(getTask('task/7')).rejects.toThrow(
       'The task API response must include a numeric id.',
@@ -112,6 +145,14 @@ describe('getTask', () => {
     expect(request).toHaveBeenCalledWith('/tasks/task%2F7', {
       signal: undefined,
     });
+  });
+
+  it('rejects a task response without a data field', async () => {
+    request.mockResolvedValue({ status: 200, message: 'Success.' });
+
+    await expect(getTask('7')).rejects.toThrow(
+      'The task API response must include task data.',
+    );
   });
 });
 
@@ -126,7 +167,11 @@ describe('updateTask', () => {
       is_completed: true,
       created_at: '2026-09-01T08:00:00.000Z',
     };
-    request.mockResolvedValue(updatedTask);
+    request.mockResolvedValue({
+      status: 200,
+      message: 'Task updated successfully.',
+      data: updatedTask,
+    });
 
     const abortController = new AbortController();
     const result = await updateTask(
@@ -158,7 +203,11 @@ describe('updateTask', () => {
   });
 
   it('rejects an updated-task response without a numeric id', async () => {
-    request.mockResolvedValue(null);
+    request.mockResolvedValue({
+      status: 200,
+      message: 'Task updated successfully.',
+      data: null,
+    });
 
     await expect(
       updateTask('7', {
@@ -169,6 +218,20 @@ describe('updateTask', () => {
         is_completed: false,
       }),
     ).rejects.toThrow('The updated task response must include a numeric id.');
+  });
+
+  it('rejects an updated-task response without a data field', async () => {
+    request.mockResolvedValue({ status: 200, message: 'Success.' });
+
+    await expect(
+      updateTask('7', {
+        title: 'Task',
+        description: null,
+        priority: 'medium',
+        due_date: null,
+        is_completed: false,
+      }),
+    ).rejects.toThrow('The updated task response must include task data.');
   });
 });
 
