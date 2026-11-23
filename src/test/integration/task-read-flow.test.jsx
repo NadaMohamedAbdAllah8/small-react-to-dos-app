@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { taskFixtures } from '../fixtures/tasks';
-import { apiUrl } from '../mocks/handlers';
+import { apiUrl, createApiResponse } from '../mocks/handlers';
 import { server } from '../mocks/server';
 import { renderApp } from '../test-utils';
 
@@ -38,7 +38,9 @@ describe('task read flows', () => {
     server.use(
       http.get(`${apiUrl}/tasks/:taskId`, ({ params }) => {
         requestedTaskIds.push(params.taskId);
-        return HttpResponse.json(taskFixtures[1]);
+        return createApiResponse(taskFixtures[1], {
+          message: 'Task retrieved successfully.',
+        });
       }),
     );
     renderApp();
@@ -57,7 +59,9 @@ describe('task read flows', () => {
 
   it('renders the empty state with a create action', async () => {
     server.use(
-      http.get(`${apiUrl}/tasks`, () => HttpResponse.json([])),
+      http.get(`${apiUrl}/tasks`, () =>
+        createApiResponse([], { message: 'Tasks retrieved successfully.' }),
+      ),
     );
     renderApp();
 
@@ -82,7 +86,9 @@ describe('task read flows', () => {
               { message: 'Temporary list failure.' },
               { status: 500 },
             )
-          : HttpResponse.json(taskFixtures);
+          : createApiResponse(taskFixtures, {
+              message: 'Tasks retrieved successfully.',
+            });
       }),
     );
     renderApp();
